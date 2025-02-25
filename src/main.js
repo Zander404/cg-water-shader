@@ -1,8 +1,9 @@
 import * as THREE from "three";
-import vertexShader from "../shaders/vertexShader.glsl";
-import fragmentShader from "../shaders/fragmentShader.glsl";
+import vertexShader from "/shaders/vertexShader.glsl";
+import fragmentShader from "/shaders/fragmentShader.glsl";
 
 import { OrbitControls } from "three/examples/jsm/Addons.js";
+
 
 // WORLD
 const rendered = new THREE.WebGLRenderer();
@@ -24,32 +25,53 @@ controls.update();
 
 // OBJECTS
 
-//Plane 
-const geometryPlane = new THREE.PlaneGeometry(0.75, 0.75, 64,64);
+// Texture
+
+const textureLoader = new THREE.TextureLoader()
+const texture = textureLoader.load("static/texture/water_texture.jpg");
+
+
+
+//Plane
+const geometryPlane = new THREE.PlaneGeometry(4, 4, 64, 64);
 const materialPlane = new THREE.RawShaderMaterial({
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
   side: THREE.DoubleSide,
+  uniforms: {
+    u_amplitude: {value: 12},
+    u_time: {value: 0},
+    u_texture: {value: texture}
+
+  }
 });
 const plane = new THREE.Mesh(geometryPlane, materialPlane);
 scene.add(plane);
-console.log(plane.geometry)
+console.log(plane.geometry);
 
 // ADD Ondulation to Plane
-
 const amount = geometryPlane.attributes.position.count;
 const newAtributeArray = new Float32Array(amount);
 
-for(let i = 0; i<amount; i++){
-    newAtributeArray[i] = i%2;
+for (let i = 0; i < amount; i++) {
+  newAtributeArray[i] = i % 2;
 }
 
+geometryPlane.setAttribute(
+  "a_modulus",
+  new THREE.BufferAttribute(newAtributeArray, 1)
+);
 
-geometryPlane.setAttribute("a_modulus", new THREE.BufferAttribute(newAtributeArray,1));
-
+// Clock
+const clock = new THREE.Clock();
 
 // RENDER
 function animate() {
+  const elapsedTime = clock.getElapsedTime();
+
+  // Update Animation
+  materialPlane.uniforms.u_time.value=elapsedTime;
+
   requestAnimationFrame(animate);
   controls.update();
   rendered.render(scene, camera);
