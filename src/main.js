@@ -36,8 +36,6 @@ const materialPlane = new THREE.RawShaderMaterial({
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
   side: THREE.DoubleSide,
-  transparent: true,
-  opacity: 0.5,
   uniforms: {
     u_amplitude: { value: 12 },
     u_time: { value: 0 },
