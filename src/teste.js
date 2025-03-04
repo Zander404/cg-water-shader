@@ -1,14 +1,8 @@
 import * as THREE from "three";
 import vertexShader from "/shaders/vertexShader.glsl";
 import fragmentShader from "/shaders/fragmentShader.glsl";
-
 import { OrbitControls } from "three/examples/jsm/Addons.js";
 import { color } from "three/tsl";
-
-// WORLD
-const rendered = new THREE.WebGLRenderer();
-rendered.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(rendered.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
@@ -17,74 +11,160 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 5;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, rendered.domElement);
+// Position the camera
+camera.position.set(0, 60, 100);
 
+const controls = new OrbitControls(camera, renderer.domElement);
 controls.update();
 
-// OBJECTS
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-// Texture
+// Mirror Reflection
 
-const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load("static/texture/water_texture.jpg");
+const renderTarget = new THREE.WebGLRenderTarget(
+  window.innerWidth,
+  window.innerHeight
+);
 
-//Plane
-const geometryPlane = new THREE.PlaneGeometry(4, 4, 64, 64);
-const materialPlane = new THREE.RawShaderMaterial({
-  vertexShader: vertexShader,
-  fragmentShader: fragmentShader,
-  side: THREE.DoubleSide,
-  uniforms: {
-    u_amplitude: { value: 12 },
-    u_time: { value: 0 },
-    u_texture: { value: texture },
-  },
-});
+const mirrorCamera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-const plane = new THREE.Mesh(geometryPlane, materialPlane);
-scene.add(plane);
-console.log(plane.geometry);
+// Scencario
 
-// Cube 1
-const geometryBox = new THREE.BoxGeometry(1, 1, 1, 1);
-const cube1Material = new THREE.MeshBasicMaterial({
-  transparent: true,
-  opacity: 0.5,
-});
+const geometryPlaneRoom = new THREE.PlaneGeometry(100.1, 100.1);
 
-const cube = new THREE.Mesh(geometryBox, cube1Material);
-cube.position.z = 1;
+const planeTop = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "red",
+  })
+);
+
+planeTop.position.set(0, 100, 0);
+planeTop.rotateX(Math.PI / 2);
+scene.add(planeTop);
+
+const planeBotton = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "red",
+  })
+);
+
+planeBotton.rotateX(-Math.PI / 2);
+scene.add(planeBotton);
+
+const planeLeft = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "blue",
+  })
+);
+planeLeft.rotateY(Math.PI / 2);
+
+planeLeft.position.set(-50, 50, 0);
+scene.add(planeLeft);
+
+const planeRight = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "blue",
+  })
+);
+
+planeRight.rotateY(-Math.PI / 2);
+planeRight.position.set(50, 50, 0);
+scene.add(planeRight);
+
+const planeBack = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "yellow",
+  })
+);
+
+planeBack.position.set(0, 50, -50);
+
+scene.add(planeBack);
+
+const planeFront = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.MeshBasicMaterial({
+    color: "yellow",
+  })
+);
+
+planeFront.position.set(0, 50, 50);
+planeFront.rotateY(-Math.PI);
+scene.add(planeFront);
+
+// Plane Refraction
+const planeRefraction = new THREE.Mesh(
+  geometryPlaneRoom,
+  new THREE.ShaderMaterial({
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: THREE.DoubleSide,
+    uniforms: {
+      u_mirrorTexture: { value: renderTarget.texture },
+      u_alpha: { value: 0.5 },
+    },
+    transparent: true,
+  })
+);
+
+planeRefraction.rotateY(-Math.PI / 2);
+planeRefraction.position.set(0, 50, 0);
+scene.add(planeRefraction);
+
+// =========================================
+// Objects
+
+// First Object
+const cubeGeometry = new THREE.BoxGeometry(10, 10, 10, 10);
+const cube = new THREE.Mesh(
+  cubeGeometry,
+  new THREE.MeshBasicMaterial({
+    color: "black",
+  })
+);
+cube.position.set(-30, 45, -20);
 
 scene.add(cube);
 
-// ADD Ondulation to Plane
-const amount = geometryPlane.attributes.position.count;
-const newAtributeArray = new Float32Array(amount);
-
-for (let i = 0; i < amount; i++) {
-  newAtributeArray[i] = i % 2;
-}
-
-geometryPlane.setAttribute(
-  "a_modulus",
-  new THREE.BufferAttribute(newAtributeArray, 1)
+// Second Object
+const sphereGeometry = new THREE.SphereGeometry(10, 10, 10, 10);
+const sphere = new THREE.Mesh(
+  sphereGeometry,
+  new THREE.MeshBasicMaterial({
+    color: "black",
+  })
 );
+sphere.position.set(-30, 45, 20);
 
-// Clock
-const clock = new THREE.Clock();
-// RENDER
+scene.add(sphere);
+
 function animate() {
-  const elapsedTime = clock.getElapsedTime();
+  controls.update();
 
-  // Update Animation
-  materialPlane.uniforms.u_time.value = elapsedTime;
+  // Mirror Camera
+  mirrorCamera.position.copy(camera.position);
+  mirrorCamera.lookAt(planeRefraction.position);
+
+  renderer.setRenderTarget(renderTarget);
+  renderer.render(scene, mirrorCamera);
+  renderer.setRenderTarget(null);
 
   requestAnimationFrame(animate);
-  controls.update();
-  rendered.render(scene, camera);
-  rendered.setClearColor(0xff0000, 0.15);
+  renderer.render(scene, camera);
 }
-
 animate();
