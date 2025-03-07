@@ -108,7 +108,6 @@ planeFront.rotateY(-Math.PI);
 scene.add(planeFront);
 // ===================================================================
 
-
 // ================= Mirror Plane ====================================
 const mirrorGeometry = new THREE.PlaneGeometry(100, 100);
 const planeRefraction = new THREE.Mesh(
@@ -138,7 +137,7 @@ const cube = new THREE.Mesh(
 cube.position.set(30, 45, 20);
 scene.add(cube);
 
-// Sphere 
+// Sphere
 const sphere = new THREE.Mesh(
   new THREE.SphereGeometry(10, 10, 10),
   new THREE.MeshBasicMaterial({ color: "white" })
@@ -148,42 +147,47 @@ scene.add(sphere);
 
 // ====== Camera Reflection Function ======
 function updateMirrorCamera(mainCamera, mirror, mirrorCamera) {
-  let normal = new THREE.Vector3(0, 0, 1); // Normal of the Plane
-  normal.applyQuaternion(planeRefraction.quaternion); //Ajust the rotation of the plane
-  let d = normal.dot(planeRefraction.position);
+  let normal = new THREE.Vector3();
+  mirror.getWorldDirection(normal);
+  normal.negate(); // Flip for correct reflection
 
-  // Reflection of the Camera Position
-  let mirroredPosition = camera.position.clone();
+  let d = normal.dot(mirror.position);
+
+  // Compute mirrored position
+  let mirroredPosition = mainCamera.position.clone();
   mirroredPosition.sub(
-    normal.clone().multiplyScalar(2*(camera.position.dot(normal) - d))
+    normal.clone().multiplyScalar(2 * (mainCamera.position.dot(normal) - d))
   );
 
-  // 🔥 Clamp position to stay inside the room
-  mirroredPosition.x = Math.max(
+  // 🔥 Clamp inside the room
+  mirroredPosition.x = THREE.MathUtils.clamp(
+    mirroredPosition.x,
     ROOM_BOUNDS.minX,
-    Math.min(ROOM_BOUNDS.maxX, mirroredPosition.x)
+    ROOM_BOUNDS.maxX
   );
-  mirroredPosition.y = Math.max(
+  mirroredPosition.y = THREE.MathUtils.clamp(
+    mirroredPosition.y,
     ROOM_BOUNDS.minY,
-    Math.min(ROOM_BOUNDS.maxY, mirroredPosition.y)
+    ROOM_BOUNDS.maxY
   );
-  mirroredPosition.z = Math.max(
+  mirroredPosition.z = THREE.MathUtils.clamp(
+    mirroredPosition.z,
     ROOM_BOUNDS.minZ,
-    Math.min(ROOM_BOUNDS.maxZ, mirroredPosition.z)
+    ROOM_BOUNDS.maxZ
   );
-
 
   mirrorCamera.position.copy(mirroredPosition);
+  mirrorCamera.lookAt(mirror.position);
 
-  mirrorCamera.lookAt(planeRefraction.position);
-
+  // 🔥 Fix scene inversion by flipping the X scale
+  mirrorCamera.scale.set(-1, 1, 1);
 
   mirrorCamera.updateProjectionMatrix();
 }
 
+
 const mirrorNormal = new THREE.Vector3(0, 0, 1); // Adjust if needed
 mirrorNormal.applyQuaternion(planeRefraction.quaternion);
-
 
 function animate() {
   updateMirrorCamera(camera, planeRefraction, mirrorCamera);
