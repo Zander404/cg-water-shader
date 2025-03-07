@@ -51,6 +51,18 @@ controls.maxDistance = 600;
 controls.minDistance = 10;
 controls.update();
 
+// ==================== Lights Walls ==========================
+// Add a light source
+const light = new THREE.DirectionalLight(0xffffff, 1.5);
+light.position.set(50, 100, 50); // Position above the scene
+scene.add(light);
+
+// Optional: Add ambient light for a softer look
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+scene.add(ambientLight);
+
+// ===========================================================
+
 // ==================== Scene Walls ==========================
 
 const geometryPlaneRoom = new THREE.PlaneGeometry(100, 100);
@@ -114,11 +126,14 @@ const planeRefraction = new THREE.Mesh(
   mirrorGeometry,
   new THREE.ShaderMaterial({
     vertexShader: vertexShader,
+    glslVersion: THREE.GLSL3,
     fragmentShader: fragmentShader,
     // side: THREE.DoubleSide,
     uniforms: {
       u_mirrorTexture: { value: renderTarget.texture },
+      u_time: { value: 5.0 },
       u_alpha: { value: 0.5 }, // Adjust transparency
+      u_lightPos: { value: light.position },
     },
     transparent: true,
   })
@@ -147,56 +162,53 @@ scene.add(sphere);
 
 // ====== Camera Reflection Function ======
 function updateMirrorCamera(mainCamera, mirror, mirrorCamera) {
-  let normal = new THREE.Vector3();
-  mirror.getWorldDirection(normal);
-  normal.negate(); // Flip for correct reflection
+  let normal = new THREE.Vector3(0, 0, 1); // Normal of the Plane
+  normal.applyQuaternion(planeRefraction.quaternion); // Adjust the rotation of the plane
+  let d = normal.dot(planeRefraction.position);
 
-  let d = normal.dot(mirror.position);
-
-  // Compute mirrored position
-  let mirroredPosition = mainCamera.position.clone();
+  // Reflection of the Camera Position
+  let mirroredPosition = camera.position.clone();
   mirroredPosition.sub(
-    normal.clone().multiplyScalar(2 * (mainCamera.position.dot(normal) - d))
+    normal.clone().multiplyScalar(2 * (camera.position.dot(normal) - d))
   );
 
-  // 🔥 Clamp inside the room
-  mirroredPosition.x = THREE.MathUtils.clamp(
-    mirroredPosition.x,
+  // 🔥 Clamp position to stay inside the room
+  mirroredPosition.x = Math.max(
     ROOM_BOUNDS.minX,
-    ROOM_BOUNDS.maxX
+    Math.min(ROOM_BOUNDS.maxX, mirroredPosition.x)
   );
-  mirroredPosition.y = THREE.MathUtils.clamp(
-    mirroredPosition.y,
+  mirroredPosition.y = Math.max(
     ROOM_BOUNDS.minY,
-    ROOM_BOUNDS.maxY
+    Math.min(ROOM_BOUNDS.maxY, mirroredPosition.y)
   );
-  mirroredPosition.z = THREE.MathUtils.clamp(
-    mirroredPosition.z,
+  mirroredPosition.z = Math.max(
     ROOM_BOUNDS.minZ,
-    ROOM_BOUNDS.maxZ
+    Math.min(ROOM_BOUNDS.maxZ, mirroredPosition.z)
   );
 
   mirrorCamera.position.copy(mirroredPosition);
-  mirrorCamera.lookAt(mirror.position);
-
-  // 🔥 Fix scene inversion by flipping the X scale
-  mirrorCamera.scale.set(-1, 1, 1);
-
+  mirrorCamera.lookAt(planeRefraction.position);
   mirrorCamera.updateProjectionMatrix();
+  mirrorCamera.scale.set(-1, 1, 1);
 }
-
 
 const mirrorNormal = new THREE.Vector3(0, 0, 1); // Adjust if needed
 mirrorNormal.applyQuaternion(planeRefraction.quaternion);
 
+const clock = new THREE.Clock();
+
 function animate() {
+  const elapsedTime = clock.getElapsedTime();
+  // planeRefraction.uniforms.u_time.value = elapsedTime;
+  // Update the mirror camera
   updateMirrorCamera(camera, planeRefraction, mirrorCamera);
 
-  // Render reflection
+  // Render the reflection (update reflection texture)
   renderer.setRenderTarget(renderTarget);
-  renderer.render(scene, mirrorCamera);
+  renderer.render(scene, mirrorCamera); // Render reflection with the mirror camera
   renderer.setRenderTarget(null);
 
+  // Render the scene normally with the main camera
   renderer.render(scene, camera);
 
   requestAnimationFrame(animate);
