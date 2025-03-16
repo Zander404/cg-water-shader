@@ -46,15 +46,15 @@ controls.update();
 
 // ==================== Lights Walls ==========================
 // Add a light source
-const light = new THREE.DirectionalLight(0xffffff, 1.5);
-light.position.set(50, 100, 50); // Position above the scene
+const light = new THREE.DirectionalLight(0xffffff, 5);
+light.position.set(50, 100, 50);
 scene.add(light);
 
-// Optional: Add ambient light for a softer look
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+// Ambient light for a softer look
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
 scene.add(ambientLight);
 
-// ===========================================================
+// ======================ROOM=====================================
 
 scene.add(room.planeBottom);
 scene.add(room.planeTop);
@@ -80,7 +80,7 @@ const mirrorMaterial = new THREE.ShaderMaterial({
   uniforms: {
     u_mirrorTexture: { value: renderTarget.texture },
     u_time: { value: 5.0 },
-    u_alpha: { value: 0.5 }, // Adjust transparency
+    u_alpha: { value: 1.0 }, // Adjust transparency
     u_waterTexture: { value: waterTexture },
   },
   transparent: true,
@@ -105,20 +105,20 @@ scene.add(scene_objects.cube);
 
 //Shere
 scene_objects.sphere.position.set(0, 45, 20);
+
 scene.add(scene_objects.sphere);
 
 // ====== Camera Reflection Function ======
-function updateMirrorCamera(mainCamera, mirror, mirrorCamera) {
+function updateMirrorCamera(mainCamera, mirrorCamera) {
   let normal = new THREE.Vector3(0, 0, -1); // Normal of the Plane
   normal.applyQuaternion(planeRefraction.quaternion); // Adjust the rotation of the plane
   let d = normal.dot(planeRefraction.position);
 
   // Reflection of the Camera Position
   const mirroredPosition = mainCamera.position.clone();
-  // console.log(mirroredPosition)
 
   mirroredPosition.sub(
-    normal.clone().multiplyScalar(2 * mainCamera.position.dot(normal))
+    normal.clone().multiplyScalar(2 * mainCamera.position.dot(normal) - d)
   );
 
   // Clamp in the room
@@ -144,17 +144,16 @@ function updateMirrorCamera(mainCamera, mirror, mirrorCamera) {
   mirrorCamera.updateProjectionMatrix();
 }
 
-const mirrorNormal = new THREE.Vector3(1, 0, 0); // Adjust if needed
+const mirrorNormal = new THREE.Vector3(0, 0, 1); // Adjust if needed
 mirrorNormal.applyQuaternion(planeRefraction.quaternion);
 
 function animate() {
-
   // Update the mirror camera
-  updateMirrorCamera(camera, planeRefraction, mirrorCamera);
+  updateMirrorCamera(camera, mirrorCamera);
 
-  // Render the reflection (update reflection texture)
+  // Reflection
   renderer.setRenderTarget(renderTarget);
-  renderer.render(scene, mirrorCamera); // Render reflection with the mirror camera
+  renderer.render(scene, mirrorCamera);
   renderer.setRenderTarget(null);
 
   // Render the scene normally with the main camera

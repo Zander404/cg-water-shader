@@ -31,7 +31,9 @@ void main() {
     uv.x += wave(uv); // Distort in X axis for ripple effect
     uv.y += wave(uv + vec2(0.1, 0.1)); // Distort in Y axis for additional wave movement
 
+
     // Texture
+// ============================================================================
     vec4 waterColor = texture(u_waterTexture, uv);
 
     // Light
@@ -39,13 +41,17 @@ void main() {
     vec3 lightDir = normalize(u_lightPos - vec3(uv, 0.0));
     float diff = max(dot(normal, lightDir), 0.0); // Diffuse term
 
+// ============================================================================
+
     // Reflection 
     vec3 viewDir = normalize(-vec3(uv, 0.0)); // View direction (camera direction)
     vec3 reflectDir = reflect(-lightDir, normal); // Reflection direction
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0); // Specular term
 
-    vec2 flippedUv = vec2(1.0 - vUv.x, vUv.y); // Flip the UV horizontally
+    vec2 flippedUv = vec2(1.0 - uv.x, uv.y); // Flip the UV horizontally
     vec4 reflection = texture(u_mirrorTexture, flippedUv);
+
+// ============================================================================
 
     // Apply lighting to the reflection
     vec3 finalColor = waterColor.rgb * reflection.rgb * (0.5 + diff * 0.5); // Diffuse lighting
@@ -53,8 +59,6 @@ void main() {
 
     // Clamp the final color to ensure it is within the valid range [0, 1]
     finalColor = clamp(finalColor, 0.0, 1.0);
-
-
 
     // Output final color with transparency
     fragColor = vec4(finalColor, u_alpha); // Set the output color

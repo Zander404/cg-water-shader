@@ -37,15 +37,15 @@ const planeLeft = new THREE.Mesh(
 planeLeft.rotateY(Math.PI / 2);
 planeLeft.position.set(-50, 50, 0);
 
-// Right Wall (Blue)
+// Right Wall (Yellow)
 const planeRight = new THREE.Mesh(
   geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "brown" })
+  new THREE.MeshBasicMaterial({ color: "yellow" })
 );
 planeRight.rotateY(-Math.PI / 2);
 planeRight.position.set(50, 50, 0);
 
-// Back Wall (Orange)
+// Back Wall (Purple)
 const planeBack = new THREE.Mesh(
   geometryPlaneRoom,
   new THREE.MeshBasicMaterial({ color: "purple" })
@@ -55,11 +55,13 @@ planeBack.position.set(0, 50, -50);
 // Front Wall (Yellow)
 const planeFront = new THREE.Mesh(
   geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "yellow" })
+  new THREE.MeshBasicMaterial({ color: "cyan" })
 );
 
 planeFront.position.set(0, 50, 50);
 planeFront.rotateY(-Math.PI);
+
+
 // ===================================================================
 
 export default {
