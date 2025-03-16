@@ -1,7 +1,10 @@
 import * as THREE from "three";
+import * as dat from "dat.gui";
 import vertexShader from "/shaders/vertexShader.glsl";
 import fragmentShader from "/shaders/fragmentShader.glsl";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
+import room from "./objects/room";
+import scene_objects from "./objects/scene_objects";
 
 // Scene, Camera & Renderer
 const scene = new THREE.Scene();
@@ -34,16 +37,6 @@ const mirrorCamera = new THREE.PerspectiveCamera(
   500
 );
 
-// Limit of the ROOM
-const ROOM_BOUNDS = {
-  minX: -50,
-  maxX: 50,
-  minY: 0,
-  maxY: 100,
-  minZ: -50,
-  maxZ: 50,
-};
-
 // Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 
@@ -51,152 +44,119 @@ controls.maxDistance = 600;
 controls.minDistance = 10;
 controls.update();
 
-// ==================== Scene Walls ==========================
+// ==================== Lights Walls ==========================
+// Add a light source
+const light = new THREE.DirectionalLight(0xffffff, 5);
+light.position.set(50, 100, 50);
+scene.add(light);
 
-const geometryPlaneRoom = new THREE.PlaneGeometry(100, 100);
+// Ambient light for a softer look
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+scene.add(ambientLight);
 
-// Ceiling (Blue)
-const planeTop = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "blue" })
-);
-planeTop.position.set(0, 100, 0);
-planeTop.rotateX(Math.PI / 2);
-scene.add(planeTop);
+// ======================ROOM=====================================
 
-// Floor (Red)
-const planeBottom = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "red" })
-);
-planeBottom.rotateX(-Math.PI / 2);
-scene.add(planeBottom);
+scene.add(room.planeBottom);
+scene.add(room.planeTop);
 
-// Left Wall (Green)
-const planeLeft = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "green" })
-);
-planeLeft.rotateY(Math.PI / 2);
-planeLeft.position.set(-50, 50, 0);
-scene.add(planeLeft);
+scene.add(room.planeFront);
+scene.add(room.planeBack);
 
-// Right Wall (Blue)
-const planeRight = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "blue" })
-);
-planeRight.rotateY(-Math.PI / 2);
-planeRight.position.set(50, 50, 0);
-scene.add(planeRight);
-
-// Back Wall (Orange)
-const planeBack = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "orange" })
-);
-planeBack.position.set(0, 50, -50);
-scene.add(planeBack);
-
-// Front Wall (Yellow)
-const planeFront = new THREE.Mesh(
-  geometryPlaneRoom,
-  new THREE.MeshBasicMaterial({ color: "yellow" })
-);
-planeFront.position.set(0, 50, 50);
-planeFront.rotateY(-Math.PI);
-scene.add(planeFront);
-// ===================================================================
+scene.add(room.planeRight);
+scene.add(room.planeLeft);
 
 // ================= Mirror Plane ====================================
+
+const textureLoader = new THREE.TextureLoader();
+const waterTexture = textureLoader.load("/static/texture/water_texture.jpg");
+
 const mirrorGeometry = new THREE.PlaneGeometry(100, 100);
-const planeRefraction = new THREE.Mesh(
-  mirrorGeometry,
-  new THREE.ShaderMaterial({
-    vertexShader: vertexShader,
-    fragmentShader: fragmentShader,
-    // side: THREE.DoubleSide,
-    uniforms: {
-      u_mirrorTexture: { value: renderTarget.texture },
-      u_alpha: { value: 0.5 }, // Adjust transparency
-    },
-    transparent: true,
-  })
-);
+
+const mirrorMaterial = new THREE.ShaderMaterial({
+  glslVersion: THREE.GLSL3,
+  vertexShader: vertexShader,
+  fragmentShader: fragmentShader,
+
+  uniforms: {
+    u_mirrorTexture: { value: renderTarget.texture },
+    u_time: { value: 5.0 },
+    u_alpha: { value: 1.0 }, // Adjust transparency
+    u_waterTexture: { value: waterTexture },
+  },
+  transparent: true,
+});
+const planeRefraction = new THREE.Mesh(mirrorGeometry, mirrorMaterial);
 
 planeRefraction.position.set(0, 50, 0);
 scene.add(planeRefraction);
 
+const gui = new dat.GUI();
+const params = { u_alpha: 1.0 };
+
+gui.add(params, "u_alpha", 0, 1).onChange((value) => {
+  mirrorMaterial.uniforms.u_alpha.value = value;
+});
+
 // ======================= Objects in the Scene =======================
 
 // Cube
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(10, 10, 10),
-  new THREE.MeshBasicMaterial({ color: "white" })
-);
-cube.position.set(30, 45, 20);
-scene.add(cube);
+scene_objects.cube.position.set(30, 45, -40);
+scene.add(scene_objects.cube);
 
-// Sphere
-const sphere = new THREE.Mesh(
-  new THREE.SphereGeometry(10, 10, 10),
-  new THREE.MeshBasicMaterial({ color: "white" })
-);
-sphere.position.set(-30, 45, 20);
-scene.add(sphere);
+//Shere
+scene_objects.sphere.position.set(0, 45, 20);
+
+scene.add(scene_objects.sphere);
 
 // ====== Camera Reflection Function ======
-function updateMirrorCamera(mainCamera, mirror, mirrorCamera) {
-  let normal = new THREE.Vector3();
-  mirror.getWorldDirection(normal);
-  normal.negate(); // Flip for correct reflection
+function updateMirrorCamera(mainCamera, mirrorCamera) {
+  let normal = new THREE.Vector3(0, 0, -1); // Normal of the Plane
+  normal.applyQuaternion(planeRefraction.quaternion); // Adjust the rotation of the plane
+  let d = normal.dot(planeRefraction.position);
 
-  let d = normal.dot(mirror.position);
+  // Reflection of the Camera Position
+  const mirroredPosition = mainCamera.position.clone();
 
-  // Compute mirrored position
-  let mirroredPosition = mainCamera.position.clone();
   mirroredPosition.sub(
-    normal.clone().multiplyScalar(2 * (mainCamera.position.dot(normal) - d))
+    normal.clone().multiplyScalar(2 * mainCamera.position.dot(normal) - d)
   );
 
-  // 🔥 Clamp inside the room
-  mirroredPosition.x = THREE.MathUtils.clamp(
-    mirroredPosition.x,
-    ROOM_BOUNDS.minX,
-    ROOM_BOUNDS.maxX
+  // Clamp in the room
+  mirroredPosition.x = Math.max(
+    room.ROOM_BOUNDS.minX,
+    Math.min(room.ROOM_BOUNDS.maxX, mirroredPosition.x)
   );
-  mirroredPosition.y = THREE.MathUtils.clamp(
-    mirroredPosition.y,
-    ROOM_BOUNDS.minY,
-    ROOM_BOUNDS.maxY
+  mirroredPosition.y = Math.max(
+    room.ROOM_BOUNDS.minY,
+    Math.min(room.ROOM_BOUNDS.maxY, mirroredPosition.y)
   );
-  mirroredPosition.z = THREE.MathUtils.clamp(
-    mirroredPosition.z,
-    ROOM_BOUNDS.minZ,
-    ROOM_BOUNDS.maxZ
+  mirroredPosition.z = Math.max(
+    room.ROOM_BOUNDS.minZ,
+    Math.min(room.ROOM_BOUNDS.maxZ, mirroredPosition.z)
   );
 
   mirrorCamera.position.copy(mirroredPosition);
-  mirrorCamera.lookAt(mirror.position);
-
-  // 🔥 Fix scene inversion by flipping the X scale
-  mirrorCamera.scale.set(-1, 1, 1);
-
+  mirrorCamera.lookAt(
+    planeRefraction.position.x,
+    planeRefraction.position.y,
+    planeRefraction.position.z
+  );
   mirrorCamera.updateProjectionMatrix();
 }
-
 
 const mirrorNormal = new THREE.Vector3(0, 0, 1); // Adjust if needed
 mirrorNormal.applyQuaternion(planeRefraction.quaternion);
 
 function animate() {
-  updateMirrorCamera(camera, planeRefraction, mirrorCamera);
+  // Update the mirror camera
+  updateMirrorCamera(camera, mirrorCamera);
 
-  // Render reflection
+  // Reflection
   renderer.setRenderTarget(renderTarget);
   renderer.render(scene, mirrorCamera);
   renderer.setRenderTarget(null);
 
+  // Render the scene normally with the main camera
   renderer.render(scene, camera);
 
   requestAnimationFrame(animate);
