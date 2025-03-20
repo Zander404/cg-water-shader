@@ -110,11 +110,11 @@ scene.add(sphere);
 
 
 // Add a sphere for reflection/refraction
-// const cubeGeometry = new THREE.boxGe(2, 32, 32);
-// const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-// const cube = new THREE.Mesh(sphereGeometry, sphereMaterial);
-// sphere.position.set(10, 30, 0);
-// scene.add(sphere);
+const cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
+const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+cube.position.set(0, 30, -30);
+scene.add(cube);
 
 // ================= Lights ====================================
 // Add lights
