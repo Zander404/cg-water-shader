@@ -1,165 +1,195 @@
 import * as THREE from "three";
-import * as dat from "dat.gui";
-import vertexShader from "/shaders/vertexShader.glsl";
-import fragmentShader from "/shaders/fragmentShader.glsl";
-import { OrbitControls } from "three/examples/jsm/Addons.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import room from "./objects/room";
 import scene_objects from "./objects/scene_objects";
+import vertexShader from "/shaders/teste/vertexShader.glsl";
+import fragmentShader from "/shaders/teste/fragmentShader.glsl";
+import * as dat from "dat.gui";
 
-// Scene, Camera & Renderer
+// Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
-  45,
+  75,
   window.innerWidth / window.innerHeight,
   0.1,
-  500
+  1000
 );
+
+camera.position.set(0, 20, 90);
+camera.rotation.set(-Math.PI / 4, 0, 0); // Adjust rotation as needed
+camera.lookAt(0, 30, 0); // Look at the center of the scene
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-
 renderer.setSize(window.innerWidth, window.innerHeight);
-
 document.body.appendChild(renderer.domElement);
 
-// Camera Position
-camera.position.set(0, 80, 200);
-
-// Reflection Render Target
-const renderTarget = new THREE.WebGLRenderTarget(2048, 2048, {
-  minFilter: THREE.LinearFilter,
-  magFilter: THREE.LinearFilter,
-  format: THREE.RGBAFormat,
-});
-
-const mirrorCamera = new THREE.PerspectiveCamera(
-  75,
-  innerWidth + innerHeight / innerHeight - innerWidth,
-  1,
-  500
-);
-
-// Controls
+// OrbitControls for camera interaction
 const controls = new OrbitControls(camera, renderer.domElement);
-
-controls.maxDistance = 600;
+controls.maxDistance = 100;
 controls.minDistance = 10;
 controls.update();
 
-// ==================== Lights Walls ==========================
-// Add a light source
-const light = new THREE.DirectionalLight(0xffffff, 5);
-light.position.set(50, 100, 50);
-scene.add(light);
-
-// Ambient light for a softer look
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-scene.add(ambientLight);
-
-// ======================ROOM=====================================
-
-scene.add(room.planeBottom);
-scene.add(room.planeTop);
-
-scene.add(room.planeFront);
-scene.add(room.planeBack);
-
-scene.add(room.planeRight);
-scene.add(room.planeLeft);
-
-// ================= Mirror Plane ====================================
-
+// Load texture for distortion (DUDV map)
 const textureLoader = new THREE.TextureLoader();
-const waterTexture = textureLoader.load("/static/texture/water_texture.jpg");
+const dudvMap = textureLoader.load("/static/texture/1.jpg");
+dudvMap.wrapS = dudvMap.wrapT = THREE.RepeatWrapping;
 
-const mirrorGeometry = new THREE.PlaneGeometry(100, 100);
+// Create a reflection render target
+const reflectionRenderTarget = new THREE.WebGLRenderTarget(
+  window.innerWidth,
+  window.innerHeight,
+  {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+  }
+);
 
-const mirrorMaterial = new THREE.ShaderMaterial({
+// Create a reflection camera
+const reflectionCamera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+reflectionCamera.position.set(0, 5, 15); // Position below the water plane
+reflectionCamera.lookAt(0, 0, 0);
+
+// Define a clipping plane at the water plane's height
+// const clippingPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 60); // Normal points downward, height = 30
+
+
+const waterMaterial = new THREE.ShaderMaterial({
   glslVersion: THREE.GLSL3,
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
-
   uniforms: {
-    u_mirrorTexture: { value: renderTarget.texture },
-    u_time: { value: 5.0 },
-    u_alpha: { value: 1.0 }, // Adjust transparency
-    u_waterTexture: { value: waterTexture },
+    u_time: { value: 0.4 },
+    uDudvMap: { value: dudvMap },
+    u_alpha: { value: 1.0 },
+    uReflectionTexture: { value: reflectionRenderTarget.texture },
+    uResolution: {
+      value: new THREE.Vector2(window.innerWidth, window.innerHeight),
+    },
+    uDistortionStrength: { value: 0.1 },
   },
   transparent: true,
+  clipping: false, // Disable clipping for the water plane
 });
-const planeRefraction = new THREE.Mesh(mirrorGeometry, mirrorMaterial);
 
-planeRefraction.position.set(0, 50, 0);
-scene.add(planeRefraction);
+// Water plane
+const waterGeometry = new THREE.PlaneGeometry(50, 50, 512, 512);
+const waterPlane = new THREE.Mesh(waterGeometry, waterMaterial);
+waterPlane.position.set(0, 30, 0); // Adjust position as needed
+waterPlane.renderOrder = 1; // Render the water plane last
+scene.add(waterPlane);
 
+// GUI for alpha control
 const gui = new dat.GUI();
 const params = { u_alpha: 1.0 };
-
 gui.add(params, "u_alpha", 0, 1).onChange((value) => {
-  mirrorMaterial.uniforms.u_alpha.value = value;
+  waterMaterial.uniforms.u_alpha.value = value;
 });
 
-// ======================= Objects in the Scene =======================
+// Add room and objects
+scene.add(room.planeBottom);
+scene.add(room.planeTop);
+scene.add(room.planeFront);
+scene.add(room.planeBack);
+scene.add(room.planeRight);
+scene.add(room.planeLeft);
 
-// Cube
-scene_objects.cube.position.set(30, 45, -40);
-scene.add(scene_objects.cube);
+// Add a sphere for reflection/refraction
+const sphereGeometry = new THREE.SphereGeometry(5, 32, 32);
+const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+sphere.position.set(0, 30, 30);
+scene.add(sphere);
 
-//Shere
-scene_objects.sphere.position.set(0, 45, 20);
+// Add a cube for reflection/refraction
+const cubeGeometry = new THREE.BoxGeometry(10, 10, 10);
+const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+cube.position.set(0, 30, -30);
+scene.add(cube);
 
-scene.add(scene_objects.sphere);
+// Add lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 
-// ====== Camera Reflection Function ======
-function updateMirrorCamera(mainCamera, mirrorCamera) {
-  let normal = new THREE.Vector3(0, 0, -1); // Normal of the Plane
-  normal.applyQuaternion(planeRefraction.quaternion); // Adjust the rotation of the plane
-  let d = normal.dot(planeRefraction.position);
+const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+pointLight.position.set(5, 10, 5);
+scene.add(pointLight);
 
-  // Reflection of the Camera Position
-  const mirroredPosition = mainCamera.position.clone();
-
-  mirroredPosition.sub(
-    normal.clone().multiplyScalar(2 * mainCamera.position.dot(normal) - d)
-  );
+function mirrorCamera(mainCamera, reflectionCamera, waterHeight) {
+  // Mirror the position
+  // reflectionCamera.position.copy(mainCamera.position);
+  // reflectionCamera.position.y = 2 * waterHeight - mainCamera.position.y; // Mirror across the water plane
 
   // Clamp in the room
-  mirroredPosition.x = Math.max(
+  reflectionCamera.x = Math.max(
     room.ROOM_BOUNDS.minX,
-    Math.min(room.ROOM_BOUNDS.maxX, mirroredPosition.x)
+    Math.min(room.ROOM_BOUNDS.maxX, reflectionCamera.x)
   );
-  mirroredPosition.y = Math.max(
+  reflectionCamera.y = Math.max(
     room.ROOM_BOUNDS.minY,
-    Math.min(room.ROOM_BOUNDS.maxY, mirroredPosition.y)
+    Math.min(room.ROOM_BOUNDS.maxY, reflectionCamera.y)
   );
-  mirroredPosition.z = Math.max(
+  reflectionCamera.z = Math.max(
     room.ROOM_BOUNDS.minZ,
-    Math.min(room.ROOM_BOUNDS.maxZ, mirroredPosition.z)
+    Math.min(room.ROOM_BOUNDS.maxZ, reflectionCamera.z)
   );
 
-  mirrorCamera.position.copy(mirroredPosition);
-  mirrorCamera.lookAt(
-    planeRefraction.position.x,
-    planeRefraction.position.y,
-    planeRefraction.position.z
-  );
-  mirrorCamera.updateProjectionMatrix();
+  reflectionCamera.position.copy(waterPlane.position);
+  reflectionCamera.lookAt(mainCamera);
+
+  // Mirror the rotation
+  reflectionCamera.rotation.copy(mainCamera.rotation);
+  reflectionCamera.rotation.x = reflectionCamera.rotation.x; // Mirror the X rotation
+
+  reflectionCamera.updateProjectionMatrix();
 }
 
-const mirrorNormal = new THREE.Vector3(0, 0, 1); // Adjust if needed
-mirrorNormal.applyQuaternion(planeRefraction.quaternion);
-
+// Animation loop
+const clock = new THREE.Clock();
 function animate() {
-  // Update the mirror camera
-  updateMirrorCamera(camera, mirrorCamera);
+  const time = clock.getElapsedTime();
 
-  // Reflection
-  renderer.setRenderTarget(renderTarget);
-  renderer.render(scene, mirrorCamera);
+  // Mirror the reflection camera
+  mirrorCamera(camera, reflectionCamera, waterPlane.position.y);
+
+  // Update shader uniforms
+  waterMaterial.uniforms.u_time.value = time;
+
+  // Render the reflection texture with clipping
+  waterPlane.visible = false; // Hide the water plane while rendering the reflection
+  renderer.setRenderTarget(reflectionRenderTarget);
+  // renderer.clippingPlanes = [clippingPlane]; // Enable clipping for the reflection camera
+  renderer.render(scene, reflectionCamera);
   renderer.setRenderTarget(null);
+  renderer.clippingPlanes = []; // Disable clipping for the main camera
+  waterPlane.visible = true; // Show the water plane again
 
-  // Render the scene normally with the main camera
+  // Update controls
+  controls.update();
+
+  // Render the scene with the main camera (no clipping)
   renderer.render(scene, camera);
-
   requestAnimationFrame(animate);
 }
 
 animate();
+
+// Handle window resize
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  waterMaterial.uniforms.uResolution.value.set(
+    window.innerWidth,
+    window.innerHeight
+  );
+
+  // Update reflection render target size
+  reflectionRenderTarget.setSize(window.innerWidth, window.innerHeight);
+});

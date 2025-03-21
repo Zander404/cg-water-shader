@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import * as dat from "dat.gui";
-import vertexShader from "/shaders/vertexShader.glsl";
-import fragmentShader from "/shaders/fragmentShader.glsl";
+import vertexShader from "/shaders/mirror/vertexShader.glsl";
+import fragmentShader from "/shaders/mirror/fragmentShader.glsl";
 import { OrbitControls } from "three/examples/jsm/Addons.js";
 import room from "./objects/room";
 import scene_objects from "./objects/scene_objects";
